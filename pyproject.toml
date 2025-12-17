@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "BInject"
-version = "0.0.1"
+name = "binject"
+version = "1.0.0"
 description = "Binject: inject shared object to apk"
 readme = "README.md"
 authors = [
-  { name="Praveen P", email="prvnprks@gmail.com" },
+  { name="Praveen P", email="prvnyoutub@gmail.com" },
 ]
 requires-python = ">=3.7"
 classifiers = [
