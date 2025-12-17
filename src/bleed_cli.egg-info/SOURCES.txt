@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/binject/__init__.py
+src/binject/cli.py
+src/binject/patch_apk.py
+src/bleed_cli.egg-info/PKG-INFO
+src/bleed_cli.egg-info/SOURCES.txt
+src/bleed_cli.egg-info/dependency_links.txt
+src/bleed_cli.egg-info/entry_points.txt
+src/bleed_cli.egg-info/requires.txt
+src/bleed_cli.egg-info/top_level.txt
