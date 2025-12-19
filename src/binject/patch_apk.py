@@ -9,9 +9,7 @@ def run_cmd(cmd_list):
     executable = shutil.which(cmd_list[0])
     if not executable:
         executable = cmd_list[0]
-    
     cmd_list[0] = executable
-    
     is_windows = sys.platform.startswith("win")
     subprocess.check_call(cmd_list, shell=is_windows)
 
@@ -36,25 +34,28 @@ def inject_so(apk, so, arch):
         shutil.rmtree(temp_dir)
     
     print("[*] Decompiling...")
-    run_cmd(["apktool", "d", "--no-res", "-f", "-o", str(temp_dir), str(apk_path)])
+    # REMOVED --no-res so we can edit the manifest.
+    # Added -f to force clean start.
+    run_cmd(["apktool", "d", "-f", "-o", str(temp_dir), str(apk_path)])
 
     manifest_path = temp_dir / "AndroidManifest.xml"
     if manifest_path.exists():
         try:
             content = manifest_path.read_text(encoding='utf-8')
             
+            # 1. REMOVE JUNK ATTRIBUTES (The main reason recompilation fails)
+            # This strips attributes that usually cause "Resource not found" or "AAPT2" errors.
+            content = re.sub(r'\s+android:(compileSdkVersion|compileSdkVersionCodename|appComponentFactory|allowNativeHeapPointerTagging|isSplitRequired|extractNativeLibs)="[^"]*"', '', content)
             
-            content = re.sub(r'android:(compileSdkVersion|compileSdkVersionCodename|appComponentFactory)="[^"]*"', '', content)
-            
-            
-            internet_perm = '<uses-permission android:name="android.permission.INTERNET" />'
+            # 2. ADD INTERNET PERMISSION
             if 'android.permission.INTERNET' not in content:
-                
-                content = content.replace('<application', f'    {internet_perm}\n    <application', 1)
+                print("[*] Adding Internet permission...")
+                # Insert right before the <application tag
+                content = content.replace('<application', '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
             
             manifest_path.write_text(content, encoding='utf-8')
         except UnicodeDecodeError:
-            print("[!] Warning: AndroidManifest.xml is binary. Skipping sanitization.")
+            print("[!] Warning: AndroidManifest.xml is still binary. Modification failed.")
 
     print(f"[*] Copying library to lib/{arch}...")
     lib_dir = temp_dir / "lib" / arch
@@ -84,6 +85,7 @@ def inject_so(apk, so, arch):
     target_file.write_text(smali_code, encoding='utf-8')
 
     print("[*] Recompiling...")
+    # --use-aapt2 is essential when you've modified the manifest
     run_cmd(["apktool", "b", "--use-aapt2", "-o", str(output_apk), str(temp_dir)])
 
     if temp_dir.exists():
