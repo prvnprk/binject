@@ -25,3 +25,8 @@ options:
 
 
 ```
+
+## Features
+
+- injects loadlibrary() to main activity
+- injects internet permissions to AndroidManifest.xml if not present
