@@ -2,6 +2,7 @@ import sys
 import shutil
 import subprocess
 import re
+import os
 from pathlib import Path
 from androguard.core.apk import APK
 
@@ -12,6 +13,37 @@ def run_cmd(cmd_list):
     cmd_list[0] = executable
     is_windows = sys.platform.startswith("win")
     subprocess.check_call(cmd_list, shell=is_windows)
+
+def fix_resource_errors(temp_dir):
+    """
+    Scans the res folder and removes attributes that commonly cause 
+    apktool build failures (like accessibilityPaneTitle).
+    """
+    print("[*] Cleaning up problematic resource attributes...")
+   
+    bad_attrs = [
+        r'android:accessibilityPaneTitle="[^"]*"',
+        r'android:compileSdkVersion="[^"]*"',
+        r'android:compileSdkVersionCodename="[^"]*"',
+        r'android:appComponentFactory="[^"]*"',
+        r'android:allowNativeHeapPointerTagging="[^"]*"'
+    ]
+    
+    res_path = Path(temp_dir) / "res"
+    if not res_path.exists():
+        return
+
+    for xml_file in res_path.rglob("*.xml"):
+        try:
+            content = xml_file.read_text(encoding='utf-8')
+            original_content = content
+            for attr in bad_attrs:
+                content = re.sub(attr, '', content)
+            
+            if content != original_content:
+                xml_file.write_text(content, encoding='utf-8')
+        except:
+            continue
 
 def inject_so(apk, so, arch):
     apk_path = Path(apk).resolve()
@@ -34,28 +66,29 @@ def inject_so(apk, so, arch):
         shutil.rmtree(temp_dir)
     
     print("[*] Decompiling...")
-    # REMOVED --no-res so we can edit the manifest.
-    # Added -f to force clean start.
+
     run_cmd(["apktool", "d", "-f", "-o", str(temp_dir), str(apk_path)])
+
+
+    fix_resource_errors(temp_dir)
+
 
     manifest_path = temp_dir / "AndroidManifest.xml"
     if manifest_path.exists():
         try:
             content = manifest_path.read_text(encoding='utf-8')
             
-            # 1. REMOVE JUNK ATTRIBUTES (The main reason recompilation fails)
-            # This strips attributes that usually cause "Resource not found" or "AAPT2" errors.
-            content = re.sub(r'\s+android:(compileSdkVersion|compileSdkVersionCodename|appComponentFactory|allowNativeHeapPointerTagging|isSplitRequired|extractNativeLibs)="[^"]*"', '', content)
+
+            content = re.sub(r'android:(compileSdkVersion|compileSdkVersionCodename|appComponentFactory)="[^"]*"', '', content)
             
-            # 2. ADD INTERNET PERMISSION
+
             if 'android.permission.INTERNET' not in content:
                 print("[*] Adding Internet permission...")
-                # Insert right before the <application tag
                 content = content.replace('<application', '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
             
             manifest_path.write_text(content, encoding='utf-8')
         except UnicodeDecodeError:
-            print("[!] Warning: AndroidManifest.xml is still binary. Modification failed.")
+            print("[!] Warning: AndroidManifest.xml is binary. Skipping sanitization.")
 
     print(f"[*] Copying library to lib/{arch}...")
     lib_dir = temp_dir / "lib" / arch
@@ -85,7 +118,7 @@ def inject_so(apk, so, arch):
     target_file.write_text(smali_code, encoding='utf-8')
 
     print("[*] Recompiling...")
-    # --use-aapt2 is essential when you've modified the manifest
+
     run_cmd(["apktool", "b", "--use-aapt2", "-o", str(output_apk), str(temp_dir)])
 
     if temp_dir.exists():
