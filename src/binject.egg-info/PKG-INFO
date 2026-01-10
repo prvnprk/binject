@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: binject
-Version: 1.0.1
+Version: 1.0.2
 Summary: Binject: inject shared object to apk
 Author-email: Praveen P <prvnyoutub@gmail.com>
 Project-URL: Homepage, https://github.com/prvnprk/binject
@@ -38,3 +38,8 @@ options:
 
 
 ```
+
+## Features
+
+- injects loadlibrary() to main activity
+- injects internet permissions to AndroidManifest.xml if not present
